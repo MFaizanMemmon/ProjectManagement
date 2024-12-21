@@ -1,0 +1,44 @@
+﻿@page "/login"
+@layout MinimalLayout
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@attribute [AllowAnonymous]
+
+<div class="container d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+    <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
+        <h3 class="text-center mb-4">Login</h3>
+        <EditForm Model="@model" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-danger" />
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Username</label>
+                <InputText id="username" @bind-Value="model.UserName" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+                <label for="password" class="form-label">Password</label>
+                <InputText id="password" @bind-Value="model.Password" type="password" class="form-control" />
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Login</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    Users model = new Users();
+    private async Task HandleLogin()
+    {
+        if (await AuthService.LoginAsync(model.UserName, model.Password))
+        {
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            // Handle login failure (e.g., show error message)
+        }
+    }
+}

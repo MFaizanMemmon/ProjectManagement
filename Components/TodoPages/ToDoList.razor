@@ -1,0 +1,145 @@
+﻿@page "/TodoList/{ProjectId}"
+@using Microsoft.AspNetCore.Components.QuickGrid
+@inject ITodoService service
+@inject IProjectService projectService
+@inject IJSRuntime js
+
+<div class="container mt-5">
+    <!-- Loading Spinner -->
+    @if (toDoList == null)
+    {
+        <div class="d-flex justify-content-center align-items-center" style="height: 100vh;">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-3">Loading, please wait...</span>
+        </div>
+    }
+    else
+    {
+        <!-- Add Task Button -->
+        <div class="mb-3 d-flex justify-content-between">
+            <h1>@ProjectName</h1>
+            <button class="btn btn-primary" @onclick="ShowModal">
+                <i class="fas fa-plus-circle"></i> Add Task
+            </button>
+        </div>
+
+        <!-- Tasks Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5>Task List</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-responsive table-striped">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Status</th>
+                            <th>Due Date</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var toDoItem in toDoList)
+                        {
+                            <tr>
+                                <td>@toDoItem.Name</td>
+                                <td>
+                                    @if (!string.IsNullOrEmpty(toDoItem.Status) && toDoItem.Status == "Completed")
+                                    {
+                                        <span class="badge bg-success">@toDoItem.Status</span>
+                                    }
+                                    else if (toDoItem.Status == "New")
+                                    {
+                                        <span class="badge bg-secondary">@toDoItem.Status</span>
+                                    }
+                                    else if (toDoItem.Status == "Pending")
+                                    {
+                                        <span class="badge bg-warning">@toDoItem.Status</span>
+                                    }
+                                </td>
+                                <td>@toDoItem.DueDate.ToString("dd-MMM-yyyy")</td>
+                                <td>
+                                    <button class="btn btn-warning btn-sm" @onclick="(() => PrepareForEdit(toDoItem))">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-danger btn-sm ms-2" @onclick="(() => Delete(toDoItem.TodoId))">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Task Modal -->
+@if (isModalVisible)
+{
+    <AddEditTodo TaskObject="@taskObject" OnClose="@CloseModal" LoadData="@RefreshGrid">
+        <CustomHeader>@CustomHeader</CustomHeader>
+    </AddEditTodo>
+}
+
+@code {
+    [Parameter]
+    public string ProjectId { get; set; }
+
+
+    public string? ProjectName { get; set; }
+
+    private bool isModalVisible = false;
+    List<ToDo> toDoList;
+    ToDo taskObject = new ToDo();
+    public string? CustomHeader { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        toDoList = (await service.Get()).Where(x => x.ProjectID == Convert.ToInt16(ProjectId)).ToList();
+        var project = await projectService.Get(Convert.ToInt16(ProjectId));
+        if (project != null)
+        {
+            ProjectName = project.ProjectName; // Replace "Name" with the correct property
+        }
+
+    }
+
+    private async void RefreshGrid()
+    {
+        toDoList = (await service.Get()).Where(x => x.ProjectID == Convert.ToInt16(ProjectId)).ToList();
+        
+        StateHasChanged();
+    }
+
+    private void PrepareForEdit(ToDo task)
+    {
+        taskObject = task;
+        CustomHeader = "Edit Task";
+        isModalVisible = true;
+    }
+
+    private void ShowModal()
+    {
+        taskObject = new ToDo();
+        taskObject.DueDate = DateTime.Now;
+        CustomHeader = "Add Task";
+        taskObject.ProjectID = int.Parse(ProjectId);
+        isModalVisible = true;
+    }
+
+    private async Task Delete(int id)
+    {
+        var task = await service.Delete(id);
+        CloseModal();
+        RefreshGrid();
+    }
+
+    private void CloseModal()
+    {
+        isModalVisible = false; // Hide the modal
+    }
+}

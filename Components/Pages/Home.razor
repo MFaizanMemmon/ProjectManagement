@@ -1,0 +1,66 @@
+﻿@page "/"
+@inject IIteam teamService
+@inject IProjectService projectService
+@inject ITodoService todoService
+@inject IIteam _teamService
+
+<PageTitle>Home</PageTitle>
+
+<div class="container py-4">
+    <!-- Header Section -->
+    <div class="mb-4">
+        <h1 class="h3">Project Management Dashboard</h1>
+        <p class="text-muted">Track your projects, tasks, and progress at a glance.</p>
+    </div>
+
+    <!-- Project Summary Cards -->
+    <div class="row">
+        <div class="col-md-4">
+            <div class="dashboard-card">
+                <h5>Total Projects</h5>
+                <h2>@TotalProject</h2>
+                <p class="text-muted">Active: 8, Completed: @TotalCompleteTask</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card">
+                <h5>Pending Tasks</h5>
+                <h2>@TotalNewTask</h2>
+                <p class="text-muted">Due Today: 5</p>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="dashboard-card">
+                <h5>Team Members</h5>
+                <h2>@TotalMember</h2>
+                <p class="text-muted">Active Teams: 3</p>
+            </div>
+        </div>
+    </div>
+
+   
+  
+</div>
+
+
+@code{
+    public int TotalMember { get; set; }
+    public int TotalProject { get; set; }
+    public int TotalNewTask { get; set; }
+    public int TotalCompleteTask { get; set; }
+
+
+    List<Project> projectList = new List<Project>();
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        TotalMember = (await teamService.Get()).Sum(x => x.TeamId);
+        TotalProject = (await projectService.Get()).Sum(x => x.ProjectId);
+        TotalNewTask = (await todoService.Get()).Where(x => x.Status == "New").Sum(x => x.ProjectID);
+        TotalMember = (await _teamService.Get()).Sum(x => x.TeamId);
+        TotalCompleteTask = (await todoService.Get()).Where(x => x.Status == "Completed").Sum(x => x.ProjectID);
+        projectList = await projectService.Get();
+    }
+
+}

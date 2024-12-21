@@ -1,0 +1,140 @@
+﻿@page "/TeamList"
+@inject IIteam itemService
+@inject IProjectService projectService
+@inject ITeamProject teamProjectSerive
+
+
+<div class="container mt-5">
+    <!-- Loading Spinner -->
+    @if (teamList == null)
+    {
+        <div class="d-flex justify-content-center align-items-center" style="height: 100vh;">
+            <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <span class="ms-3">Loading, please wait...</span>
+        </div>
+    }
+    else
+    {
+        <!-- Add Task Button -->
+        <div class="mb-3 d-flex justify-content-between">
+            <h1>Team Members</h1>
+            <button class="btn btn-primary" @onclick="showModal">
+                <i class="fas fa-plus-circle"></i> Add Team
+            </button>
+        </div>
+
+        <!-- Tasks Table -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5>Member List</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-responsive table-striped">
+                    <thead>
+                        <tr>
+                            <td>ID</td>
+                            <th>Name</th>
+                            <th>Role</th>
+                            <th>Projects</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var toDoItem in teamWithProject)
+                        {
+                            <tr>
+                                <td>@toDoItem.MemberId</td>
+                                <td>@toDoItem.MemberName</td>
+                                <td>@toDoItem.Role</td>
+                                <td>@toDoItem.Projects</td>
+                                <td>
+                                    <button class="btn btn-warning btn-sm">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-danger btn-sm ms-2">
+                                        <i class="fas fa-trash-alt"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+            </div>
+        </div>
+    }
+</div>
+
+@if (isModalVisible)
+{
+    <AddEditTeam team="team" CloseModal="CloseModal" LoadData="FillGrid">
+    </AddEditTeam>
+
+}
+
+@code {
+    List<Teams> teamList = new List<Teams>();
+    List<Project> projectList = new List<Project>();
+    List<TeamMemberProjects> teamProject = new List<TeamMemberProjects>();
+    private List<dynamic> teamWithProject = new List<dynamic>();
+
+    Teams team = new Teams();
+    private bool isModalVisible = false;
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        teamList = await itemService.Get();
+        projectList = await projectService.Get();
+        teamProject = await teamProjectSerive.GetTeamProjects();
+
+        teamWithProject = teamList.Select(item => new
+        {
+            MemberId = item.TeamId,
+            MemberName = item.MemberName,
+            Role = item.Role,
+            Projects = string.Join(", ",
+        teamProject
+            .Where(tp => tp.TeamMemberID == item.TeamId) // Filter team projects by the current team ID
+            .Select(tp => projectList.FirstOrDefault(p => p.ProjectId == tp.ProjectId)?.ProjectName)) // Map to project names
+        }).OrderBy(x => x.MemberName).ToList<dynamic>();
+
+    }
+
+    private async void FillGrid()
+    {
+        teamList = await itemService.Get();
+        projectList = await projectService.Get();
+        teamProject = await teamProjectSerive.GetTeamProjects();
+
+        teamWithProject = teamList.Select(item => new
+        {
+            MemberId = item.TeamId,
+            MemberName = item.MemberName,
+            Role = item.Role,
+            Projects = string.Join(", ",
+        teamProject
+            .Where(tp => tp.TeamMemberID == item.TeamId) // Filter team projects by the current team ID
+            .Select(tp => projectList.FirstOrDefault(p => p.ProjectId == tp.ProjectId)?.ProjectName)) // Map to project names
+        }).OrderBy(x => x.MemberName).ToList<dynamic>();
+
+
+
+        StateHasChanged();
+    }
+
+    private void showModal()
+    {
+        team = new Teams();
+        isModalVisible = true;
+
+    }
+
+    private void CloseModal()
+    {
+        isModalVisible = false;
+
+    }
+}

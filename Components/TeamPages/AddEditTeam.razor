@@ -1,0 +1,137 @@
+﻿@inject IProjectService _projectService
+@inject IIteam _teamService
+@inject ITeamProject _teamProjectService
+
+@inject IJSRuntime js
+
+<div class="modal-backdrop show"></div>
+<div class="modal" tabindex="-1" role="dialog" style="display: block;">
+    <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+        <div class="modal-content shadow-lg rounded-lg">
+            <div class="modal-header ">
+                <h5 class="modal-title">Add Team</h5>
+                <button type="button" class="btn-close" aria-label="Close" @onclick="Cancel"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="@team" OnSubmit="HandleSubmit">
+
+                    <DataAnnotationsValidator></DataAnnotationsValidator>
+                    <ValidationSummary></ValidationSummary>
+
+                    <!-- Member Name -->
+                    <div class="mb-4">
+                        <label for="MemberName" class="form-label fw-semibold">Name</label>
+                        <input type="text" id="MemberName" class="form-control" @bind-value="team.MemberName" placeholder="Enter team member's name" />
+                        <ValidationMessage For="@(() => team.MemberName)" class="text-danger"></ValidationMessage>
+                    </div>
+
+                    <!-- Role Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold" for="Role">Role</label>
+                        <InputSelect id="Role" class="form-select" @bind-Value="team.Role">
+                            <option disabled selected value="">Select Role</option>
+                            <option value="Developer">Developer</option>
+                            <option value="SQA">SQA</option>
+                            <option value="Project Manager">Project Manager</option>
+                        </InputSelect>
+                        <ValidationMessage For="@(() => team.Role)" class="text-danger"></ValidationMessage>
+                    </div>
+
+                    <!-- Projects Selection -->
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Assign Projects</label>
+                        <div class="container">
+                            <div class="row gy-2">
+                                @if (team?.Projects != null)
+                                {
+                                    @foreach (var item in team.Projects)
+                                    {
+                                        <div class="col-md-6">
+                                            <div class="form-check">
+                                                <input type="checkbox" @bind-value="@item.Checked" class="form-check-input" id="@item.ProjectName">
+                                                <label class="form-check-label" for="@item.ProjectName">@item.ProjectName</label>
+                                            </div>
+                                        </div>
+                                    }
+                                }
+                                else
+                                {
+                                    <p class="text-muted">No projects available.</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Footer -->
+                    <div class="modal-footer d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-secondary" @onclick="Cancel">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public Teams? team { get; set; }
+
+    [Parameter]
+    public EventCallback CloseModal { get; set; }
+
+    [Parameter]
+    public Action LoadData { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        team = new Teams { Projects = new List<Project>() };
+        team.Projects = await _projectService.Get() ?? new List<Project>();
+    }
+
+    private void Cancel()
+    {
+        CloseModal.InvokeAsync();
+    }
+
+    private async Task HandleSubmit()
+    {
+        if (team.TeamId == 0)
+        {
+            await _teamService.Add(team);
+            if (team.TeamId > 0)
+            {
+                var ActiveProjectIds = team.Projects.Where(x => x.Checked == true).ToList();
+                
+                List<TeamMemberProjects> ListOfTeamProject = ActiveProjectIds
+                    .Select(item => new TeamMemberProjects
+                        {
+                            TeamMemberProjectId = team.TeamId,
+                            ProjectId = item.ProjectId,
+                            TeamMemberID = team.TeamId
+                        }).ToList();
+
+
+                var result = _teamProjectService.AddTeamProjectList(ListOfTeamProject);
+                if (result.Id > 0)
+                {
+                    Cancel();
+                }
+
+
+            }
+
+        }
+        else
+        {
+            await _teamService.Update(team);
+        }
+        LoadData.Invoke();
+    }
+
+
+
+
+
+
+}

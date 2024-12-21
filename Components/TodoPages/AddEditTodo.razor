@@ -1,0 +1,187 @@
+﻿@inject ITodoService service
+@inject IJSRuntime js
+
+<div class="modal-backdrop show"></div>
+
+    <div class="modal" tabindex="-1" role="dialog" id="taskModal" style="display: block;">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg rounded-lg">
+            <div class="modal-header">
+                <h5 class="modal-title">@CustomHeader</h5>
+                <button type="button" class="btn-close" @onclick="Close" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <EditForm Model="@TaskObject" OnValidSubmit="HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label for="taskName" class="form-label">Task Name</label>
+                        <InputText id="taskName" class="form-control" @bind-Value="TaskObject.Name" />
+                        <ValidationMessage For="@(() => TaskObject.Name)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="status" class="form-label">Status</label>
+                        <InputSelect id="status" class="form-control" @bind-Value="TaskObject.Status">
+                            <option value="">Select</option>
+                            @foreach (var status in TaskStatusList)
+                            {
+                                <option value="@status">@status</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="@(() => TaskObject.Status)" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dueDate" class="form-label">Due Date</label>
+                        <InputDate id="dueDate" class="form-control" @bind-Value="TaskObject.DueDate" />
+                        <ValidationMessage For="@(() => TaskObject.DueDate)" />
+                    </div>
+
+                    <!-- Multiple Image and Video Upload with Preview -->
+                    <div class="mb-3 d-none">
+                        <label for="fileUpload" class="form-label">Upload Images & Videos</label>
+                        <InputFile id="fileUpload" class="form-control" OnChange="HandleFileSelected" multiple MaxAllowedSize="10485760" />
+                        <ValidationMessage For="@(() => TaskObject.FileNames)" />
+                    </div>
+
+                    <!-- Previews for Images and Videos -->
+                    @if (filePreviews != null && filePreviews.Any())
+                    {
+                        <div class="file-previews d-none">
+                            @foreach (var file in filePreviews)
+                            {
+                                if (file.Type.StartsWith("image"))
+                                {
+                                    <img src="@file.Url" class="img-thumbnail m-2" style="max-width: 100px; max-height: 100px;" />
+                                }
+                                else if (file.Type.StartsWith("video"))
+                                {
+                                    <video width="200" controls>
+                                        <source src="@file.Url" type="@file.Type" />
+                                        Your browser does not support the video tag.
+                                    </video>
+                                }
+                            }
+                        </div>
+                    }
+
+                    <div class="modal-footer d-flex justify-content-between">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" class="btn btn-secondary" @onclick="Close">Cancel</button>
+                    </div>
+
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public ToDo TaskObject { get; set; }
+
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    [Parameter]
+    public Action LoadData { get; set; }
+
+    
+    [Parameter]
+    public RenderFragment CustomHeader { get; set; }
+
+    List<string> TaskStatusList = new List<string>() { "New", "In Progress", "Completed" };
+
+    private List<IBrowserFile> selectedFiles = new List<IBrowserFile>(); // For storing selected files
+    private List<FilePreview> filePreviews = new List<FilePreview>(); // For storing file previews
+
+    private async Task HandleValidSubmit()
+    {
+        // Handle the file upload and saving of task details
+        if (TaskObject.TodoId == 0)
+        {
+            foreach (var file in selectedFiles)
+            {
+                var fileName = file.Name;
+                var filePath = Path.Combine("wwwroot/uploads", fileName);
+
+                // Save the file to the server asynchronously
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.OpenReadStream().CopyToAsync(fileStream);
+                }
+
+                // Store the file name(s) in the TaskObject
+                TaskObject.FileNames = string.Join(",", selectedFiles.Select(f => f.Name));
+            }
+
+            await service.Add(TaskObject);
+        }
+        else
+        {
+            foreach (var file in selectedFiles)
+            {
+                var fileName = file.Name;
+                var filePath = Path.Combine("wwwroot/uploads", fileName);
+
+                // Save the file to the server asynchronously
+                using (var fileStream = new FileStream(filePath, FileMode.Create))
+                {
+                    await file.OpenReadStream().CopyToAsync(fileStream);
+                }
+
+                // Store the file name(s) in the TaskObject
+                TaskObject.FileNames = string.Join(",", selectedFiles.Select(f => f.Name));
+            }
+
+            await service.Update(TaskObject);
+        }
+
+        Close();
+        LoadData.Invoke();
+        await js.InvokeVoidAsync("showToastr", "Success", "Task has been saved successfully!");
+    }
+
+    private void Close()
+    {
+        OnClose.InvokeAsync();
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        // Store selected files for upload
+        selectedFiles.Clear();
+        selectedFiles.AddRange(e.GetMultipleFiles());
+
+        // Generate previews for each selected file
+        filePreviews.Clear();
+        foreach (var file in selectedFiles)
+        {
+            var fileType = file.ContentType;
+
+            // Convert file stream to byte array asynchronously
+            using (var memoryStream = new MemoryStream())
+            {
+                // Read the file stream asynchronously
+                await file.OpenReadStream().CopyToAsync(memoryStream);
+                var fileBytes = memoryStream.ToArray(); // Convert stream to byte array
+                var base64 = Convert.ToBase64String(fileBytes); // Convert byte array to base64 string
+                var fileUrl = $"data:{fileType};base64,{base64}"; // Create base64 URL for preview
+
+                filePreviews.Add(new FilePreview
+                    {
+                        Type = fileType,
+                        Url = fileUrl
+                    });
+            }
+        }
+    }
+
+    public class FilePreview
+    {
+        public string Type { get; set; }
+        public string Url { get; set; }
+    }
+}

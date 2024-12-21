@@ -1,0 +1,112 @@
+﻿@page "/CreateProject"
+@inject IProjectService projectService
+@inject IJSRuntime js
+
+<div class="container mt-5">
+    <!-- Card for the form -->
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white text-center">
+            <h4>Create New Project</h4>
+        </div>
+        <div class="card-body">
+            <!-- Project creation form -->
+            <EditForm class="mb-3" Model="@project" OnValidSubmit="AddProject">
+                <div class="mb-3">
+                    <label for="projectName" class="form-label">Project Name</label>
+                    <InputText id="projectName" class="form-control" @bind-Value="project.ProjectName" placeholder="Enter project name" />
+                </div>
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary">Create Project</button>
+                </div>
+            </EditForm>
+
+            <!-- Project list -->
+            <div class="mt-4">
+                <h5>Existing Projects</h5>
+                <ul id="projectList" class="list-group">
+                    @if (ProjectList != null && ProjectList.Any())
+                    {
+                        @foreach (var item in ProjectList)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <a href="/TodoList/@item.ProjectId" class="text-decoration-none text-dark d-flex align-items-center">
+                                    <!-- Hand pointer icon with clickable hand cursor effect -->
+                                    <i class="bi bi-hand-index-thumb me-2" style="cursor: pointer;"></i>
+                                    @item.ProjectName
+                                </a>
+
+
+
+
+
+                                <div>
+                                    <button class="btn btn-sm btn-warning me-2" @onclick="() => EditProject(item)">
+                                        <i class="bi bi-pencil-fill"></i> <!-- Edit icon -->
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteProject(item)">
+                                        <i class="bi bi-trash-fill"></i> <!-- Delete icon -->
+                                    </button>
+                                </div>
+                            </li>
+                        }
+                    }
+                    else
+                    {
+                        <li class="list-group-item text-center">No projects available. Start by creating one!</li>
+                    }
+
+
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    public Project project { get; set; } = new Project();
+    public List<Project> ProjectList { get; set; }
+
+    private async Task AddProject()
+    {
+        if (project.ProjectId == 0)
+        {
+            await projectService.Add(project);
+            await js.InvokeVoidAsync("showToastr", "Project has been successfully added.");
+        }
+        else
+        {
+            await projectService.Update(project);
+            await js.InvokeVoidAsync("showToastr", "Project has been updated.");
+        }
+
+        project = new Project(); // Reset form
+        await GetProject();
+    }
+
+    private async Task GetProject()
+    {
+        ProjectList = await projectService.Get();
+        StateHasChanged();
+    }
+
+    private async Task EditProject(Project project)
+    {
+        this.project = project; // Set the current project to edit
+    }
+
+    private async Task DeleteProject(Project project)
+    {
+        bool confirm = await js.InvokeAsync<bool>("confirm", "Are you sure you want to delete this project?");
+        if (confirm)
+        {
+            await projectService.Delete(project.ProjectId);
+            await GetProject();
+            await js.InvokeVoidAsync("showToastr", "Project deleted successfully.");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        ProjectList = await projectService.Get();
+    }
+}
